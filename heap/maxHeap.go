@@ -1,83 +1,81 @@
-package containers
+package heap
 
-import (
-	"container/heap"
-)
+import stdHeap "container/heap"
 
-type ReversePriorityQueue struct {
-	slice []*PriorityQueueItem
-	m     map[int]*PriorityQueueItem
+type MaxHeap struct {
+	slice []*HeapItem
+	m     map[int]*HeapItem
 }
 
-func NewReversePriorityQueue() ReversePriorityQueue {
-	return ReversePriorityQueue{
-		slice: []*PriorityQueueItem{},
-		m:     map[int]*PriorityQueueItem{},
+func NewMaxHeap() MaxHeap {
+	return MaxHeap{
+		slice: []*HeapItem{},
+		m:     map[int]*HeapItem{},
 	}
 }
 
-func (pq *ReversePriorityQueue) Len() int {
-	return len(pq.slice)
+func (heap *MaxHeap) Len() int {
+	return len(heap.slice)
 }
 
-func (pq *ReversePriorityQueue) Less(i, j int) bool {
-	return pq.slice[i].Freq > pq.slice[j].Freq
+func (heap *MaxHeap) Less(i, j int) bool {
+	return heap.slice[i].Freq > heap.slice[j].Freq
 }
 
-func (pq *ReversePriorityQueue) Swap(i, j int) {
-	pq.slice[i], pq.slice[j] = pq.slice[j], pq.slice[i]
-	pq.slice[i].Index = i
-	pq.slice[j].Index = j
+func (heap *MaxHeap) Swap(i, j int) {
+	heap.slice[i], heap.slice[j] = heap.slice[j], heap.slice[i]
+	heap.slice[i].Index = i
+	heap.slice[j].Index = j
 }
 
-func (pq *ReversePriorityQueue) Push(x any) {
-	newItem := x.(*PriorityQueueItem)
+func (heap *MaxHeap) Push(x any) {
+	newItem := x.(*HeapItem)
 
-	if item, ok := pq.m[newItem.Id]; ok {
+	if item, ok := heap.m[newItem.Id]; ok {
 		item.Freq = newItem.Freq
-		heap.Fix(pq, item.Index)
+		stdHeap.Fix(heap, item.Index)
 	} else {
-		newItem.Index = pq.Len()
-		pq.slice = append(pq.slice, newItem)
-		pq.m[newItem.Id] = newItem
-		heap.Fix(pq, newItem.Index)
+		newItem.Index = heap.Len()
+		heap.slice = append(heap.slice, newItem)
+		heap.m[newItem.Id] = newItem
+		stdHeap.Fix(heap, newItem.Index)
 	}
 }
 
-func (pq *ReversePriorityQueue) Pop() any {
-	n := len(pq.slice) - 1
-	pq.Swap(0, n) // Swap root with last element
-	item := pq.slice[n]
-	pq.slice = pq.slice[:n] // Remove last element
-	delete(pq.m, item.Id)
-	heap.Fix(pq, 0) // Heapify to maintain heap property
+func (heap *MaxHeap) Pop() any {
+	n := len(heap.slice) - 1
+	heap.Swap(0, n)
+	item := heap.slice[n]
+	heap.slice = heap.slice[:n]
+	delete(heap.m, item.Id)
+	stdHeap.Fix(heap, 0)
 	return item
 }
 
-func (pq *ReversePriorityQueue) Peek() any {
-	return pq.slice[0]
+func (heap *MaxHeap) Peek() any {
+	return heap.slice[0]
 }
 
-func (pq *ReversePriorityQueue) Update(id int, freq int) bool {
-	if item, ok := pq.m[id]; ok {
+func (heap *MaxHeap) Update(id int, freq int) bool {
+	if item, ok := heap.m[id]; ok {
 		item.Freq = freq
-		heap.Fix(pq, item.Index)
+		stdHeap.Fix(heap, item.Index)
 		return true
 	}
 
 	return false
 }
 
-func (pq *ReversePriorityQueue) Collect() []*PriorityQueueItem {
-	// items := make([]int, pq.Len())
-	// for i := range pq.slice {
-	// 	items[i] = pq.slice[i].Id
+func (heap *MaxHeap) Collect() []*HeapItem {
+	// items := make([]int, heap.Len())
+	// for i := range heap.slice {
+	// 	items[i] = heap.slice[i].Id
 	// }
 	// return items
 
-	return pq.slice
+	return heap.slice
 }
 
-func (pq *ReversePriorityQueue) MinFreq() int {
-	return pq.slice[0].Id
+func (heap *MaxHeap) MinFreq() int {
+	return heap.slice[0].Id
 }

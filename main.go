@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"time"
 
-	topKpkg "github.com/nem0z/amazon-loop/topK"
+	topKService "github.com/nem0z/amazon-loop/topK"
 )
 
 func main() {
 
-	topK := topKpkg.New(3)
+	topK := topKService.New(3)
 
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			topK.Push(topKpkg.GenerateProduct())
+			topK.Push(topKService.GenerateProduct())
 		}
 	}()
 

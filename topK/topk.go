@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	containers "github.com/nem0z/amazon-loop/heap"
+	"github.com/nem0z/amazon-loop/heap"
 	"golang.org/x/exp/rand"
 )
 
@@ -22,8 +22,8 @@ func GenerateProduct() Product {
 
 type TopKService struct {
 	k        int
-	pq       containers.PriorityQueue
-	rpq      containers.ReversePriorityQueue
+	minHeap  heap.MinHeap
+	maxHeap  heap.MaxHeap
 	freqs    map[int]int
 	products *list.List
 	mu       sync.Mutex
@@ -32,8 +32,8 @@ type TopKService struct {
 func New(k int) *TopKService {
 	return &TopKService{
 		k:        k,
-		pq:       containers.NewPriorityQueue(),
-		rpq:      containers.NewReversePriorityQueue(),
+		minHeap:  heap.NewMinHeap(),
+		maxHeap:  heap.NewMaxHeap(),
 		freqs:    map[int]int{},
 		products: list.New(),
 		mu:       sync.Mutex{},
@@ -53,25 +53,22 @@ func (topK *TopKService) Push(product Product) {
 	topK.products.PushFront(product)
 	topK.freqs[product.id]++
 
-	pqItem := &containers.PriorityQueueItem{
+	heapItem := &heap.HeapItem{
 		Id:   product.id,
 		Freq: topK.freqs[product.id],
 	}
 
-	if topK.pq.Len() < topK.k {
-		topK.pq.Push(pqItem)
+	if topK.minHeap.Len() < topK.k {
+		topK.minHeap.Push(heapItem)
 	} else {
-		if topK.pq.Update(pqItem.Id, pqItem.Freq) {
+		if topK.minHeap.Update(heapItem.Id, heapItem.Freq) {
 			return
 		}
 
-		topK.rpq.Push(pqItem)
-		for topK.pq.Peek().(*containers.PriorityQueueItem).Freq < topK.rpq.Peek().(*containers.PriorityQueueItem).Freq {
-			rpqMax := topK.rpq.Pop()
-			pqMin := topK.pq.Pop()
-
-			topK.pq.Push(rpqMax)
-			topK.rpq.Push(pqMin)
+		topK.maxHeap.Push(heapItem)
+		for topK.minHeap.Peek().(*heap.HeapItem).Freq < topK.maxHeap.Peek().(*heap.HeapItem).Freq {
+			topK.minHeap.Push(topK.maxHeap.Pop())
+			topK.maxHeap.Push(topK.minHeap.Pop())
 		}
 	}
 }
@@ -92,16 +89,13 @@ func (topK *TopKService) Update() {
 		topK.products.Remove(back)
 		topK.freqs[product.id]--
 
-		topK.pq.Update(product.id, topK.freqs[product.id])
-		topK.rpq.Update(product.id, topK.freqs[product.id])
+		topK.minHeap.Update(product.id, topK.freqs[product.id])
+		topK.maxHeap.Update(product.id, topK.freqs[product.id])
 	}
 
-	for topK.pq.Peek().(*containers.PriorityQueueItem).Freq < topK.rpq.Peek().(*containers.PriorityQueueItem).Freq {
-		rpqMax := topK.rpq.Pop()
-		pqMin := topK.pq.Pop()
-
-		topK.pq.Push(rpqMax)
-		topK.rpq.Push(pqMin)
+	for topK.minHeap.Peek().(*heap.HeapItem).Freq < topK.maxHeap.Peek().(*heap.HeapItem).Freq {
+		topK.minHeap.Push(topK.maxHeap.Pop())
+		topK.maxHeap.Push(topK.minHeap.Pop())
 	}
 }
 
@@ -113,7 +107,7 @@ func (topK *TopKService) Unlock() {
 	topK.mu.Unlock()
 }
 
-func (topK *TopKService) Collect() ([]*containers.PriorityQueueItem, []*containers.PriorityQueueItem) {
+func (topK *TopKService) Collect() ([]*heap.HeapItem, []*heap.HeapItem) {
 	topK.Update()
-	return topK.pq.Collect(), topK.rpq.Collect()
+	return topK.minHeap.Collect(), topK.maxHeap.Collect()
 }

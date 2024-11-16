@@ -44,7 +44,12 @@ func (topK *TopKService) Freqs() map[int]int {
 	return topK.freqs
 }
 
-func (topK *TopKService) Push(product Product) {
+func (topK *topKService) balance() {
+	for topK.minHeap.Peek().(*heap.HeapItem).Freq < topK.maxHeap.Peek().(*heap.HeapItem).Freq {
+		topK.minHeap.Push(topK.maxHeap.Pop())
+		topK.maxHeap.Push(topK.minHeap.Pop())
+	}
+}
 	topK.mu.Lock()
 	defer topK.mu.Unlock()
 
@@ -60,27 +65,16 @@ func (topK *TopKService) Push(product Product) {
 
 	if topK.minHeap.Len() < topK.k {
 		topK.minHeap.Push(heapItem)
-	} else {
-		if topK.minHeap.Update(heapItem.Id, heapItem.Freq) {
-			return
-		}
-
-		topK.maxHeap.Push(heapItem)
-		for topK.minHeap.Peek().(*heap.HeapItem).Freq < topK.maxHeap.Peek().(*heap.HeapItem).Freq {
-			topK.minHeap.Push(topK.maxHeap.Pop())
-			topK.maxHeap.Push(topK.minHeap.Pop())
-		}
+		return
 	}
+
+	if topK.minHeap.Update(heapItem.Id, heapItem.Freq) {
+		return
+	}
+
+	topK.maxHeap.Push(heapItem)
+	topK.balance()
 }
-
-func (topK *TopKService) Update() {
-
-	for {
-		back := topK.products.Back()
-		if back == nil {
-			return
-		}
-
 		product := back.Value.(Product)
 		if time.Since(product.timestamp) < time.Second*3 {
 			break
@@ -93,21 +87,5 @@ func (topK *TopKService) Update() {
 		topK.maxHeap.Update(product.id, topK.freqs[product.id])
 	}
 
-	for topK.minHeap.Peek().(*heap.HeapItem).Freq < topK.maxHeap.Peek().(*heap.HeapItem).Freq {
-		topK.minHeap.Push(topK.maxHeap.Pop())
-		topK.maxHeap.Push(topK.minHeap.Pop())
-	}
-}
-
-func (topK *TopKService) Lock() {
-	topK.mu.Lock()
-}
-
-func (topK *TopKService) Unlock() {
-	topK.mu.Unlock()
-}
-
-func (topK *TopKService) Collect() ([]*heap.HeapItem, []*heap.HeapItem) {
-	topK.Update()
-	return topK.minHeap.Collect(), topK.maxHeap.Collect()
+	topK.balance()
 }

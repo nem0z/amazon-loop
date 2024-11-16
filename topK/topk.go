@@ -6,21 +6,9 @@ import (
 	"time"
 
 	"github.com/nem0z/amazon-loop/heap"
-	"golang.org/x/exp/rand"
 )
 
-type Product struct {
-	id        int
-	timestamp time.Time
-}
-
-func GenerateProduct() Product {
-	return Product{
-		id: rand.Intn(10),
-	}
-}
-
-type TopKService struct {
+type topKService struct {
 	k        int
 	minHeap  heap.MinHeap
 	maxHeap  heap.MaxHeap
@@ -29,8 +17,8 @@ type TopKService struct {
 	mu       sync.Mutex
 }
 
-func New(k int) *TopKService {
-	return &TopKService{
+func New(k int) *topKService {
+	return &topKService{
 		k:        k,
 		minHeap:  heap.NewMinHeap(),
 		maxHeap:  heap.NewMaxHeap(),
@@ -40,7 +28,22 @@ func New(k int) *TopKService {
 	}
 }
 
-func (topK *TopKService) Freqs() map[int]int {
+func (topK *topKService) Collect() ([]int, map[int]int) {
+	topK.mu.Lock()
+	defer topK.mu.Unlock()
+	topK.Update(true)
+
+	topKitems := topK.minHeap.Collect()
+	ids := make([]int, len(topKitems))
+
+	for i := range topKitems {
+		ids[i] = topKitems[i].Id
+	}
+
+	return ids, topK.freqs
+}
+
+func (topK *topKService) Freqs() map[int]int {
 	return topK.freqs
 }
 
@@ -50,6 +53,8 @@ func (topK *topKService) balance() {
 		topK.maxHeap.Push(topK.minHeap.Pop())
 	}
 }
+
+func (topK *topKService) Push(product Product) {
 	topK.mu.Lock()
 	defer topK.mu.Unlock()
 
@@ -75,6 +80,14 @@ func (topK *topKService) balance() {
 	topK.maxHeap.Push(heapItem)
 	topK.balance()
 }
+
+func (topK *topKService) Update(collecting bool) {
+	if !collecting {
+		topK.mu.Lock()
+		defer topK.mu.Unlock()
+	}
+
+	for back := topK.products.Back(); back != nil; back = topK.products.Back() {
 		product := back.Value.(Product)
 		if time.Since(product.timestamp) < time.Second*3 {
 			break
